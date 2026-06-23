@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner Presensi Kegiatan</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; margin: 0; padding: 20px; background-color: #f4f7f6; }
+    .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    h2 { color: #333; margin-bottom: 10px; }
+    .form-group { margin-bottom: 20px; text-align: left; }
+    label { font-weight: bold; display: block; margin-bottom: 8px; color: #555; font-size: 14px; }
+    select { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; background-color: #fff; cursor: pointer; }
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+    #result { padding: 15px; border-radius: 8px; font-size: 16px; font-weight: bold; display: none; margin-top: 15px; }
+    .sukses { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .gagal { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .proses { background-color: #e2e3e5; color: #383d41; }
+  </style>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+<div class="container">
+  <h2>Scanner Presensi Kegiatan</h2>
+  
+  <div class="form-group">
+    <label for="sesiSelect">Pilih Sesi Pertemuan Saat Ini:</label>
+    <select id="sesiSelect">
+      <option value="Sesi 1">Sesi 1 (Pagi)</option>
+      <option value="Sesi 2">Sesi 2 (Siang)</option>
+      <option value="Sesi 3">Sesi 3 (Sore)</option>
+    </select>
+  </div>
+
+  <div id="reader"></div>
+  <div id="result"></div>
+</div>
+
+<script>
+  // TENTUKAN URL GOOGLE APPS SCRIPT ANDA DI SINI
+  const WEB_APP_URL = https://script.google.com/macros/s/AKfycbzIqt1rDdvhQ0Ic9ocsLoe0neJzcWQeOkRYSWLwQpLv8viLWKUaDzZi5DM4cBnJcF8P0A/exec;
+
+  var html5QrcodeScanner;
+
+  function onScanSuccess(decodedText, decodedResult) {
+    html5QrcodeScanner.clear();
+    
+    var sesiTerpilih = document.getElementById('sesiSelect').value;
+    var resultDiv = document.getElementById('result');
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'proses';
+    resultDiv.innerHTML = "Sedang mengirim data ke server...";
+
+    // Mengirim data menggunakan Fetch API standar (Bypass Iframe)
+    fetch(WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      // Mengirim sebagai text/plain agar browser tidak memicu CORS preflight OPTIONS yang diblokir Google
+      body: JSON.stringify({ barcodeId: decodedText, sesi: sesiTerpilih })
+    })
+    .then(response => response.json())
+    .then(response => {
+      if (response.status === "Sukses") {
+        resultDiv.className = 'sukses';
+        resultDiv.innerHTML = "✅ BERHASIL MASUK<br><br>Nama: " + response.nama + "<br>Sesi: " + response.sesi + "<br>Jam: " + response.jam;
+      } else {
+        resultDiv.className = 'gagal';
+        resultDiv.innerHTML = "❌ ID TIDAK TERDAFTAR<br><br>ID: " + decodedText + "<br>Dicatat sebagai peserta tidak dikenal.";
+      }
+      setTimeout(startScanner, 2500);
+    })
+    .catch(error => {
+      resultDiv.className = 'gagal';
+      resultDiv.innerHTML = "Terjadi kesalahan koneksi: " + error.message;
+      setTimeout(startScanner, 3000);
+    });
+  }
+
+  function startScanner() {
+    document.getElementById('result').style.display = 'none';
+    html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+    html5QrcodeScanner.render(onScanSuccess);
+  }
+
+  window.onload = startScanner;
+</script>
+</body>
+</html>
