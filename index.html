@@ -1,385 +1,560 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Presensi CAI 2026</title>
-<style>
-  :root{
-    --ink:#13192B;
-    --ink-soft:#1C2438;
-    --paper:#F7F3EC;
-    --paper-dim:#EAE4D8;
-    --amber:#E8A33D;
-    --amber-dim:#7A5A28;
-    --green:#3FA66B;
-    --green-dim:#173324;
-    --red:#D8554A;
-    --red-dim:#3A1A18;
-    --slate:#8B92A6;
-    --slate-dim:#4B5266;
-    --line: rgba(247,243,236,0.12);
-  }
-
-  
-  * { box-sizing:border-box; }
-
-  body{
-    margin:0;
-    min-height:100vh;
-    background:
-      radial-gradient(circle at 20% -10%, rgba(232,163,61,0.10), transparent 45%),
-      var(--ink);
-    color:var(--paper);
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-    display:flex;
-    justify-content:center;
-    padding: 28px 16px 48px;
-  }
-
-  .device{
-    width:100%;
-    max-width:420px;
-  }
-
-  /* ---- Header strip ---- */
-  .topbar{
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    padding: 0 4px 18px;
-    border-bottom: 1px dashed var(--line);
-    margin-bottom:20px;
-  }
-  .brand{
-    font-family: 'Oswald', 'Segoe UI', sans-serif;
-    font-weight:600;
-    letter-spacing:0.04em;
-    text-transform:uppercase;
-    font-size:13px;
-    color:var(--amber);
-  }
-  .brand span{ color:var(--slate); font-weight:400; }
-  .clock{
-    font-family:'JetBrains Mono','Courier New',monospace;
-    font-size:13px;
-    color:var(--slate);
-    letter-spacing:0.02em;
-  }
-
-  h1{
-    font-family:'Oswald','Segoe UI',sans-serif;
-    font-weight:700;
-    font-size:30px;
-    letter-spacing:-0.01em;
-    line-height:1.05;
-    margin:0 0 4px;
-    color:var(--paper);
-  }
-  .sub{
-    font-size:13.5px;
-    color:var(--slate);
-    margin:0 0 24px;
-  }
-
-  /* ---- Session select, styled as a ticket selector tab strip ---- */
-  .form-group{ margin-bottom:18px; }
-  .form-group label{
-    display:block;
-    font-size:11px;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    color:var(--slate);
-    margin-bottom:8px;
-    font-weight:600;
-  }
-  .session-tabs{
-    display:grid;
-    grid-template-columns:1fr 1fr 1fr;
-    gap:8px;
-  }
-  .session-tabs input{ display:none; }
-  .session-tabs label.tab{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:2px;
-    padding:10px 4px;
-    border-radius:10px;
-    border:1px solid var(--line);
-    background:var(--ink-soft);
-    color:var(--slate);
-    font-size:12.5px;
-    font-weight:600;
-    text-transform:none;
-    letter-spacing:0;
-    cursor:pointer;
-    transition:border-color .15s ease, color .15s ease, background .15s ease;
-  }
-  .session-tabs label.tab .t{ font-size:10px; color:var(--slate-dim); font-weight:500; }
-  .session-tabs input:checked + label.tab{
-    border-color:var(--amber);
-    background: rgba(232,163,61,0.10);
-    color:var(--amber);
-  }
-  .session-tabs input:checked + label.tab .t{ color:var(--amber-dim); }
-  .session-tabs input:focus-visible + label.tab{
-    outline:2px solid var(--amber);
-    outline-offset:2px;
-  }
-
-  /* ---- Scanner viewport ---- */
-  .viewport-frame{
-    position:relative;
-    border-radius:16px;
-    background:#000;
-    overflow:hidden;
-    border:1px solid var(--line);
-    margin-bottom:8px;
-    aspect-ratio: 1 / 1;
-  }
-  #reader{ width:100%; height:100%; }
-  #reader img{ display:none !important; } /* hide html5-qrcode's default UI cruft */
-
-  .viewport-frame::before{
-    content:"";
-    position:absolute;
-    inset:14%;
-    border-radius:18px;
-    pointer-events:none;
-    border:2px solid rgba(232,163,61,0.55);
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.0);
-    z-index:5;
-  }
-  .scan-status{
-    position:absolute;
-    bottom:10px; left:0; right:0;
-    text-align:center;
-    font-family:'JetBrains Mono','Courier New',monospace;
-    font-size:11px;
-    letter-spacing:0.06em;
-    text-transform:uppercase;
-    color:var(--amber);
-    z-index:6;
-    text-shadow:0 1px 3px rgba(0,0,0,0.8);
-  }
-  .pulse-dot{
-    display:inline-block;
-    width:6px;height:6px;
-    border-radius:50%;
-    background:var(--amber);
-    margin-right:6px;
-    animation:pulse 1.4s ease-in-out infinite;
-  }
-  @keyframes pulse{
-    0%,100%{ opacity:1; transform:scale(1); }
-    50%{ opacity:0.35; transform:scale(0.7); }
-  }
-
-  /* hide noisy default html5-qrcode chrome, keep video */
-  #reader__dashboard_section_csr,
-  #reader__dashboard_section_swaplink,
-  #reader__header_message,
-  #reader__status_span { display:none !important; }
-  #reader video{ border-radius:16px; }
-
-  /* ---- Result: printed stub ---- */
-  #result{
-    display:none;
-    margin-top:18px;
-    background:var(--paper);
-    color:var(--ink);
-    border-radius:10px;
-    position:relative;
-    font-family:'JetBrains Mono','Courier New',monospace;
-    overflow:hidden;
-    animation: tear-in .32s cubic-bezier(.2,.8,.3,1);
-  }
-  @keyframes tear-in{
-    from{ opacity:0; transform:translateY(-8px) scaleY(0.96); }
-    to{ opacity:1; transform:translateY(0) scaleY(1); }
-  }
-  .stub-edge{
-    height:10px;
-    background-image: radial-gradient(circle at 6px 0, transparent 5px, var(--ink) 5.5px);
-    background-size: 14px 10px;
-    background-repeat: repeat-x;
-    background-position: -2px 0;
-  }
-  .stub-body{ padding:18px 20px 16px; }
-  .stub-status{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    font-weight:700;
-    font-size:14px;
-    letter-spacing:0.04em;
-    text-transform:uppercase;
-    margin-bottom:14px;
-  }
-  .stub-status .dot{ width:9px; height:9px; border-radius:50%; flex:none; }
-  .stub-row{
-    display:flex;
-    justify-content:space-between;
-    gap:12px;
-    font-size:13px;
-    padding:7px 0;
-    border-bottom:1px dashed rgba(19,25,43,0.15);
-  }
-  .stub-row:last-child{ border-bottom:none; }
-  .stub-row .k{ color:var(--slate-dim); }
-  .stub-row .v{ font-weight:600; text-align:right; }
-
-  #result.sukses .stub-status{ color:var(--green); }
-  #result.sukses .stub-status .dot{ background:var(--green); }
-  #result.gagal .stub-status{ color:var(--red); }
-  #result.gagal .stub-status .dot{ background:var(--red); }
-  #result.proses .stub-status{ color:var(--slate-dim); }
-  #result.proses .stub-status .dot{ background:var(--slate); animation:pulse 1s ease-in-out infinite; }
-
-  .footnote{
-    margin-top:18px;
-    text-align:center;
-    font-size:11px;
-    color:var(--slate-dim);
-    letter-spacing:0.02em;
-  }
-
-  @media (prefers-reduced-motion: reduce){
-    .pulse-dot, .stub-status .dot, #result{ animation:none !important; }
-  }
-</style>
-<script src="https://unpkg.com/html5-qrcode"></script>
-</head>
-<body>
-
-<div class="device">
-
-  <div class="topbar">
-    <div class="brand">CAI <span>// 2026</span></div>
-    <div class="clock" id="clock">--:--:--</div>
-  </div>
-
-  <h1>Presensi Masuk</h1>
-  <p class="sub">Arahkan kamera ke kode QR peserta untuk mencatat kehadiran.</p>
-
-  <div class="form-group">
-    <label>Sesi pertemuan saat ini</label>
-    <div class="session-tabs">
-      <input type="radio" name="sesi" id="s1" value="Sesi 1" checked>
-      <label class="tab" for="s1">Sesi 1<span class="t">Pagi</span></label>
-
-      <input type="radio" name="sesi" id="s2" value="Sesi 2">
-      <label class="tab" for="s2">Sesi 2<span class="t">Siang</span></label>
-
-      <input type="radio" name="sesi" id="s3" value="Sesi 3">
-      <label class="tab" for="s3">Sesi 3<span class="t">Sore</span></label>
-    </div>
-  </div>
-
-  <div class="viewport-frame">
-    <div id="reader"></div>
-    <div class="scan-status" id="scanStatus"><span class="pulse-dot"></span>MENCARI KODE QR</div>
-  </div>
-
-  <div id="result">
-    <div class="stub-edge"></div>
-    <div class="stub-body" id="stubBody"></div>
-  </div>
-
-  <p class="footnote">Sistem akan otomatis siap memindai peserta berikutnya.</p>
-</div>
-
-<script>
-  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxCMy_wo_WZLnBXB2nX_-7e9T7zfvI7yTQh9zBdiZL3-57XAa6Z0W7jgHS9PMCngfpRHg/exec";
-  var html5QrcodeScanner;
-  var isProcessing = false;
-
-  function getSesi(){
-    return document.querySelector('input[name="sesi"]:checked').value;
-  }
-
-  function tick(){
-    const d = new Date();
-    document.getElementById('clock').textContent = d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-  }
-  setInterval(tick, 1000);
-  tick();
-
-  function renderStub(state, fields){
-    const resultDiv = document.getElementById('result');
-    const body = document.getElementById('stubBody');
-    resultDiv.style.display = 'block';
-    resultDiv.className = state;
-
-    const label = state === 'sukses' ? 'Berhasil masuk'
-                : state === 'gagal' ? 'ID tidak terdaftar'
-                : 'Mengirim data\u2026';
-
-    let rows = fields.map(f => `<div class="stub-row"><span class="k">${f.k}</span><span class="v">${f.v}</span></div>`).join('');
-
-    body.innerHTML = `
-      <div class="stub-status"><span class="dot"></span>${label}</div>
-      ${rows}
-    `;
-  }
-
-  function setScanStatusVisible(visible){
-    document.getElementById('scanStatus').style.display = visible ? 'flex' : 'none';
-  }
-
-  function onScanSuccess(decodedText, decodedResult) {
-    if (isProcessing) return;
-    isProcessing = true;
-
-    html5QrcodeScanner.clear().catch(() => {});
-    setScanStatusVisible(false);
-
-    var sesiTerpilih = getSesi();
-
-    renderStub('proses', [
-      { k: 'ID', v: decodedText },
-      { k: 'Sesi', v: sesiTerpilih }
-    ]);
-
-    fetch(WEB_APP_URL, {
-      method: 'POST',
-      mode: 'cors',
-      body: JSON.stringify({ barcodeId: decodedText, sesi: sesiTerpilih })
-    })
-    .then(response => response.json())
-    .then(response => {
-      if (response.status === "Sukses") {
-        renderStub('sukses', [
-          { k: 'Nama', v: response.nama },
-          { k: 'Sesi', v: response.sesi },
-          { k: 'Jam', v: response.jam }
-        ]);
-      } else {
-        renderStub('gagal', [
-          { k: 'ID', v: decodedText },
-          { k: 'Status', v: 'Tidak dikenal' }
-        ]);
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    />
+    <title>Presensi CAI 2026</title>
+    <style>
+      :root {
+        --navy: #1e2a4a;
+        --navy-light: #2c3b63;
+        --blue: #3b5bff;
+        --blue-dark: #2c46d6;
+        --green: #16a34a;
+        --green-bg: #e9f8ef;
+        --red: #dc2626;
+        --red-bg: #fdedec;
+        --gray-bg: #f3f5f9;
+        --gray-line: #e2e6ee;
+        --ink: #1c2333;
+        --ink-soft: #6b7280;
+        --white: #ffffff;
+        --radius: 16px;
+        --shadow: 0 8px 24px rgba(30, 42, 74, 0.08);
       }
-      setTimeout(startScanner, 2500);
-    })
-    .catch(error => {
-      renderStub('gagal', [
-        { k: 'Kesalahan', v: error.message }
-      ]);
-      setTimeout(startScanner, 3000);
-    });
-  }
 
-  function startScanner() {
-    isProcessing = false;
-    document.getElementById('result').style.display = 'none';
-    setScanStatusVisible(true);
-    html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, /* verbose= */ false);
-    html5QrcodeScanner.render(onScanSuccess);
-  }
+      * {
+        box-sizing: border-box;
+      }
 
-  window.onload = startScanner;
-</script>
-</body>
+      body {
+        font-family:
+          "Inter",
+          "Segoe UI",
+          system-ui,
+          -apple-system,
+          Tahoma,
+          Geneva,
+          Verdana,
+          sans-serif;
+        margin: 0;
+        padding: 0;
+        background: var(--gray-bg);
+        color: var(--ink);
+        min-height: 100vh;
+      }
+
+      .app {
+        max-width: 480px;
+        margin: 0 auto;
+        min-height: 100vh;
+        background: var(--gray-bg);
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ---------- Header ---------- */
+      header {
+        background: linear-gradient(
+          135deg,
+          var(--navy) 0%,
+          var(--navy-light) 100%
+        );
+        padding: 22px 20px 20px;
+        color: var(--white);
+        border-radius: 0 0 22px 22px;
+        box-shadow: var(--shadow);
+      }
+
+      .brand-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .brand-mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .brand-mark svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .brand-text h1 {
+        font-size: 16px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: 0.2px;
+      }
+
+      .brand-text p {
+        font-size: 12px;
+        margin: 2px 0 0;
+        color: rgba(255, 255, 255, 0.65);
+        font-weight: 500;
+      }
+
+      .session-card {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+
+      .session-card label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 8px;
+      }
+
+      .select-wrap {
+        position: relative;
+      }
+
+      select#sesiSelect {
+        width: 100%;
+        padding: 11px 38px 11px 12px;
+        border-radius: 9px;
+        border: none;
+        font-size: 15px;
+        font-weight: 600;
+        background-color: var(--white);
+        color: var(--ink);
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+      }
+
+      .select-wrap::after {
+        content: "";
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        width: 9px;
+        height: 9px;
+        border-right: 2px solid var(--ink-soft);
+        border-bottom: 2px solid var(--ink-soft);
+        transform: translateY(-65%) rotate(45deg);
+        pointer-events: none;
+      }
+
+      select#sesiSelect:focus-visible {
+        outline: 3px solid rgba(59, 91, 255, 0.5);
+        outline-offset: 2px;
+      }
+
+      /* ---------- Main ---------- */
+      main {
+        flex: 1;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .scan-panel {
+        background: var(--white);
+        border-radius: var(--radius);
+        padding: 16px;
+        box-shadow: var(--shadow);
+      }
+
+      .scan-panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      .scan-panel-head h2 {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 0;
+        color: var(--ink);
+      }
+
+      .live-dot {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--green);
+        background: var(--green-bg);
+        padding: 4px 10px;
+        border-radius: 999px;
+      }
+
+      .live-dot span.dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5);
+        animation: pulse 1.6s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45);
+        }
+        70% {
+          box-shadow: 0 0 0 6px rgba(22, 163, 74, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+        }
+      }
+
+      #reader {
+        width: 100%;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #0e1424;
+        min-height: 260px;
+      }
+
+      /* tame the library's default inline styling a bit */
+      #reader img {
+        border-radius: 0;
+      }
+
+      .hint {
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--ink-soft);
+        margin-top: 12px;
+        line-height: 1.5;
+      }
+
+      /* ---------- Result ---------- */
+      #result {
+        display: none;
+        border-radius: var(--radius);
+        padding: 18px;
+        box-shadow: var(--shadow);
+      }
+
+      #result.proses {
+        background: var(--white);
+        border: 1px solid var(--gray-line);
+      }
+
+      #result.sukses {
+        background: var(--green-bg);
+        border: 1px solid #bfe6cc;
+      }
+
+      #result.gagal {
+        background: var(--red-bg);
+        border: 1px solid #f3c9c6;
+      }
+
+      .result-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .result-icon {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #result.sukses .result-icon {
+        background: var(--green);
+      }
+
+      #result.gagal .result-icon {
+        background: var(--red);
+      }
+
+      #result.proses .result-icon {
+        background: var(--gray-line);
+      }
+
+      .result-icon svg {
+        width: 20px;
+        height: 20px;
+        stroke: white;
+      }
+
+      .result-body {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .result-title {
+        font-size: 15px;
+        font-weight: 700;
+        margin: 0 0 6px;
+      }
+
+      #result.sukses .result-title {
+        color: #0e5c2c;
+      }
+
+      #result.gagal .result-title {
+        color: #8d231f;
+      }
+
+      #result.proses .result-title {
+        color: var(--ink);
+      }
+
+      .result-detail {
+        font-size: 13px;
+        color: var(--ink-soft);
+        line-height: 1.6;
+      }
+
+      .result-detail b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 10px;
+        margin-top: 4px;
+        font-size: 13px;
+      }
+
+      .detail-grid dt {
+        color: var(--ink-soft);
+        font-weight: 500;
+      }
+
+      .detail-grid dd {
+        margin: 0;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .detail-grid dd.mono {
+        font-variant-numeric: tabular-nums;
+      }
+
+      footer {
+        text-align: center;
+        padding: 14px 20px 22px;
+        font-size: 11.5px;
+        color: var(--ink-soft);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .live-dot span.dot {
+          animation: none;
+        }
+      }
+    </style>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand-row">
+          <div class="brand-mark">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                x="3"
+                y="3"
+                width="7"
+                height="7"
+                rx="1.5"
+                stroke="white"
+                stroke-width="1.8"
+              />
+              <rect
+                x="14"
+                y="3"
+                width="7"
+                height="7"
+                rx="1.5"
+                stroke="white"
+                stroke-width="1.8"
+              />
+              <rect
+                x="3"
+                y="14"
+                width="7"
+                height="7"
+                rx="1.5"
+                stroke="white"
+                stroke-width="1.8"
+              />
+              <path d="M14 14H17V17H14V14Z" fill="white" />
+              <path d="M18 14H21V17H18V14Z" fill="white" />
+              <path d="M14 18H17V21H14V18Z" fill="white" />
+              <path d="M18 18H21V21H18V18Z" fill="white" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>Presensi CAI 2026</h1>
+            <p>Pemindai kode QR peserta</p>
+          </div>
+        </div>
+
+        <div class="session-card">
+          <label for="sesiSelect">Sesi pertemuan saat ini</label>
+          <div class="select-wrap">
+            <select id="sesiSelect">
+              <option value="Sesi 1">Sesi 1 — Pagi</option>
+              <option value="Sesi 2">Sesi 2 — Siang</option>
+              <option value="Sesi 3">Sesi 3 — Sore</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <div class="scan-panel">
+          <div class="scan-panel-head">
+            <h2>Arahkan kamera ke kode QR</h2>
+            <span class="live-dot"><span class="dot"></span>Aktif</span>
+          </div>
+          <div id="reader"></div>
+          <p class="hint">
+            Pastikan kode QR berada di dalam kotak pemindai dan pencahayaan
+            cukup.
+          </p>
+        </div>
+
+        <div id="result"></div>
+      </main>
+
+      <footer>CAI 2026 · Sistem presensi internal</footer>
+    </div>
+
+    <script>
+      // TENTUKAN URL GOOGLE APPS SCRIPT ANDA DI SINI
+      const WEB_APP_URL =
+        "https://script.google.com/macros/s/AKfycbxCMy_wo_WZLnBXB2nX_-7e9T7zfvI7yTQh9zBdiZL3-57XAa6Z0W7jgHS9PMCngfpRHg/exec";
+      var html5QrcodeScanner;
+
+      const ICONS = {
+        sukses:
+          '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 13l4 4L19 7" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        gagal:
+          '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6l12 12M18 6L6 18" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        proses:
+          '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="#9aa3b2" stroke-width="2"/><path d="M12 7v5l3 2" stroke="#9aa3b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      };
+
+      function renderResult(state, titleHtml, detailHtml) {
+        var resultDiv = document.getElementById("result");
+        resultDiv.style.display = "block";
+        resultDiv.className = state;
+        resultDiv.innerHTML =
+          '<div class="result-row">' +
+          '<div class="result-icon">' +
+          ICONS[state] +
+          "</div>" +
+          '<div class="result-body">' +
+          '<p class="result-title">' +
+          titleHtml +
+          "</p>" +
+          detailHtml +
+          "</div>" +
+          "</div>";
+      }
+
+      function onScanSuccess(decodedText, decodedResult) {
+        html5QrcodeScanner.clear();
+
+        var sesiTerpilih = document.getElementById("sesiSelect").value;
+
+        renderResult(
+          "proses",
+          "Mengirim data ke server…",
+          '<p class="result-detail">Mohon tunggu sebentar.</p>',
+        );
+
+        // Mengirim data menggunakan Fetch API standar (Bypass Iframe)
+        fetch(WEB_APP_URL, {
+          method: "POST",
+          mode: "cors",
+          // Mengirim sebagai text/plain agar browser tidak memicu CORS preflight OPTIONS yang diblokir Google
+          body: JSON.stringify({ barcodeId: decodedText, sesi: sesiTerpilih }),
+        })
+          .then((response) => response.json())
+          .then((response) => {
+            if (response.status === "Sukses") {
+              renderResult(
+                "sukses",
+                "Berhasil masuk",
+                '<dl class="detail-grid">' +
+                  "<dt>Nama</dt><dd>" +
+                  response.nama +
+                  "</dd>" +
+                  "<dt>Sesi</dt><dd>" +
+                  response.sesi +
+                  "</dd>" +
+                  '<dt>Jam</dt><dd class="mono">' +
+                  response.jam +
+                  "</dd>" +
+                  "</dl>",
+              );
+            } else {
+              renderResult(
+                "gagal",
+                "ID tidak terdaftar",
+                '<dl class="detail-grid">' +
+                  "<dt>ID</dt><dd>" +
+                  decodedText +
+                  "</dd>" +
+                  "<dt>Status</dt><dd>Peserta tidak dikenal</dd>" +
+                  "</dl>",
+              );
+            }
+            setTimeout(startScanner, 2500);
+          })
+          .catch((error) => {
+            renderResult(
+              "gagal",
+              "Gagal terhubung ke server",
+              '<p class="result-detail">' + error.message + "</p>",
+            );
+            setTimeout(startScanner, 3000);
+          });
+      }
+
+      function startScanner() {
+        document.getElementById("result").style.display = "none";
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", {
+          fps: 10,
+          qrbox: 250,
+        });
+        html5QrcodeScanner.render(onScanSuccess);
+      }
+
+      window.onload = startScanner;
+    </script>
+  </body>
 </html>
